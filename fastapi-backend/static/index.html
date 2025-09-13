@@ -426,16 +426,76 @@
                 }
                 
                 const result = await response.json();
-                
+
                 statusDiv.innerHTML = `
                     <div class="success">
                         ✅ Success! Extracted ${result.frame_count} frames
                         <br><small>Video ID: ${result.video_id}</small>
                     </div>
                 `;
-                
-                // Display frames
-                framesDiv.innerHTML = result.frames.map((frameUrl, index) => `
+
+                // Display Gemini Analysis Results
+                const analysis = result.analysis;
+                let analysisHTML = '<div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0;"><h3>🤖 Gemini AI Analysis Results</h3>';
+
+                if (analysis.consolidated_products && analysis.consolidated_products.length > 0) {
+                    analysisHTML += '<h4>🛍️ Products Detected:</h4>';
+                    analysis.consolidated_products.forEach((product, index) => {
+                        analysisHTML += `
+                            <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff;">
+                                <h5>Product ${index + 1}: ${product.type ? product.type.toUpperCase() : 'Unknown'}</h5>
+                                <p><strong>Color:</strong> ${product.color || 'Not specified'}</p>
+                                <p><strong>Pattern:</strong> ${product.pattern || 'Not specified'}</p>
+                                <p><strong>Material:</strong> ${product.material || 'Not specified'}</p>
+                                <p><strong>Brand:</strong> ${product.brand_text || 'None detected'}</p>
+                                <p><strong>Description:</strong> ${product.description || 'No description'}</p>
+                                <p><strong>Confidence:</strong> ${Math.round((product.average_confidence || 0) * 100)}%</p>
+                                <p><strong>Seen in frames:</strong> ${product.frames_seen ? product.frames_seen.join(', ') : 'Unknown'}</p>
+                            </div>
+                        `;
+                    });
+
+                    // Add summary
+                    if (analysis.summary) {
+                        analysisHTML += '<h4>📊 Summary:</h4>';
+                        analysisHTML += `<p><strong>Total Products:</strong> ${analysis.total_products_detected || 0}</p>`;
+                        analysisHTML += `<p><strong>Unique Products:</strong> ${analysis.summary.total_unique_products || 0}</p>`;
+
+                        if (analysis.summary.product_types) {
+                            analysisHTML += '<p><strong>Product Types:</strong> ';
+                            const types = Object.entries(analysis.summary.product_types).map(([type, count]) => `${type} (${count})`);
+                            analysisHTML += types.join(', ') + '</p>';
+                        }
+
+                        if (analysis.summary.dominant_colors) {
+                            analysisHTML += '<p><strong>Colors Found:</strong> ';
+                            const colors = Object.entries(analysis.summary.dominant_colors).map(([color, count]) => `${color} (${count})`);
+                            analysisHTML += colors.join(', ') + '</p>';
+                        }
+
+                        if (analysis.summary.brands_detected && analysis.summary.brands_detected.length > 0) {
+                            analysisHTML += `<p><strong>Brands Detected:</strong> ${analysis.summary.brands_detected.join(', ')}</p>`;
+                        }
+                    }
+                } else {
+                    analysisHTML += '<p style="color: #666;">No fashion products detected in this video.</p>';
+                    if (analysis.summary && analysis.summary.message) {
+                        analysisHTML += `<p><em>${analysis.summary.message}</em></p>`;
+                    }
+                }
+
+                // Add raw JSON for developers
+                analysisHTML += `
+                    <details style="margin-top: 20px;">
+                        <summary style="cursor: pointer; font-weight: bold;">🔍 View Raw JSON Data</summary>
+                        <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; margin-top: 10px;">${JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                `;
+
+                analysisHTML += '</div>';
+
+                // Display frames with analysis
+                framesDiv.innerHTML = analysisHTML + result.frames.map((frameUrl, index) => `
                     <div class="frame-item">
                         <img src="http://localhost:8000${frameUrl}" alt="Frame ${index + 1}">
                         <p>Frame ${index + 1}</p>

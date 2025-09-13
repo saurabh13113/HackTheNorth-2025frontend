@@ -8,8 +8,19 @@ import os
 import uuid
 import subprocess
 import shutil
+import traceback
+import logging
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 from .downloader_file import tiktok_to_uploadfile
+from .gemini_analyzer import GeminiAnalyzer
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -88,7 +99,7 @@ def extract_frames_from_video(input_path: Path, frames_dir: Path, video_id: str)
 
 @app.get("/api")
 async def api_status():
-    return {"message": "InstaShopper API is running!", "endpoints": ["/docs", "/ingest_tiktok", "/analyze-video"]}
+    return {"message": "InstaShopper API is running!", "endpoints": ["/docs", "/ingest_tiktok", "/analyze-video", "/analyze-tiktok"]}
 
 @app.post("/ingest_tiktok")
 async def ingest_tiktok(url: str):
@@ -104,18 +115,63 @@ async def ingest_tiktok(url: str):
         r.raise_for_status()
         return {"status": "ok", "forward_resp": r.json() if r.headers.get("content-type","").startswith("application/json") else r.text}
 
-
-@app.post("/analyze-video")
-async def analyze_video(file: UploadFile = File(...)):
+@app.post("/analyze-tiktok")
+async def analyze_tiktok(video_data: VideoURL):
+    """Download TikTok video and analyze for fashion products"""
     # Generate unique video ID
     video_id = str(uuid.uuid4())
-    
+
     # Create directories
     video_dir = DATA_DIR / video_id
     frames_dir = video_dir / "frames"
     video_dir.mkdir(exist_ok=True)
     frames_dir.mkdir(exist_ok=True)
-    
+
+    try:
+        # Download TikTok video
+        upload_file = tiktok_to_uploadfile(video_data.url)
+
+        # Save downloaded video
+        input_path = video_dir / "input.mp4"
+        with open(input_path, "wb") as buffer:
+            shutil.copyfileobj(upload_file.file, buffer)
+
+        # Extract frames
+        frame_urls = extract_frames_from_video(input_path, frames_dir, video_id)
+
+        # Initialize Gemini analyzer
+        analyzer = GeminiAnalyzer()
+
+        # Analyze all frames for fashion products
+        analysis_results = analyzer.analyze_all_frames(frames_dir)
+
+        return {
+            "video_id": video_id,
+            "status": "success",
+            "source_url": video_data.url,
+            "frames": frame_urls,
+            "frame_count": len(frame_urls),
+            "analysis": analysis_results
+        }
+
+    except Exception as e:
+        # Clean up on error
+        if video_dir.exists():
+            shutil.rmtree(video_dir)
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {e}")
+
+
+@app.post("/analyze-video")
+async def analyze_video(file: UploadFile = File(...)):
+    # Generate unique video ID
+    video_id = str(uuid.uuid4())
+
+    # Create directories
+    video_dir = DATA_DIR / video_id
+    frames_dir = video_dir / "frames"
+    video_dir.mkdir(exist_ok=True)
+    frames_dir.mkdir(exist_ok=True)
+
     # Save uploaded video
     input_path = video_dir / "input.mp4"
     try:
@@ -123,23 +179,37 @@ async def analyze_video(file: UploadFile = File(...)):
             shutil.copyfileobj(file.file, buffer)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save video: {e}")
-    
+
     # Extract frames
     try:
+        logger.info(f"Extracting frames for video {video_id}")
         frame_urls = extract_frames_from_video(input_path, frames_dir, video_id)
-        
+        logger.info(f"Extracted {len(frame_urls)} frames")
+
+        # Initialize Gemini analyzer
+        logger.info("Initializing Gemini analyzer")
+        analyzer = GeminiAnalyzer()
+
+        # Analyze all frames for fashion products
+        logger.info("Starting Gemini analysis")
+        analysis_results = analyzer.analyze_all_frames(frames_dir)
+        logger.info("Analysis completed successfully")
+
         return {
             "video_id": video_id,
             "status": "success",
             "frames": frame_urls,
-            "frame_count": len(frame_urls)
+            "frame_count": len(frame_urls),
+            "analysis": analysis_results
         }
-        
+
     except Exception as e:
+        logger.error(f"Error in analyze_video: {str(e)}")
+        logger.error(traceback.format_exc())
         # Clean up on error
         if video_dir.exists():
             shutil.rmtree(video_dir)
-        raise e
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
 
 # Mount frontend after API routes
 app.mount("/", StaticFiles(directory="static", html=True), name="frontend")
