@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaShopper - Video Analyzer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 2px dashed #ddd;
+            border-radius: 8px;
+        }
+        .section h2 {
+            color: #555;
+            margin-top: 0;
+        }
+        input[type="url"], input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .video-preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        .video-preview iframe {
+            border-radius: 8px;
+        }
+        .frames-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .frame-item {
+            text-align: center;
+        }
+        .frame-item img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            margin: 20px 0;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛍️ InstaShopper - Video Analyzer</h1>
+        
+        <!-- Video Link Section -->
+        <div class="section">
+            <h2>📱 Paste Video Link</h2>
+            <input type="url" id="videoUrl" placeholder="Paste TikTok or Instagram video URL here...">
+            <button onclick="previewVideo()">Preview Video</button>
+            <button onclick="extractFramesFromPreview()">Extract Frames from Preview</button>
+            <div id="videoPreview" class="video-preview"></div>
+            <div id="previewFramesStatus"></div>
+            <div id="previewFramesResult" class="frames-grid"></div>
+        </div>
+        
+        <!-- Video Upload Section -->
+        <div class="section">
+            <h2>📁 Upload Video File</h2>
+            <input type="file" id="videoFile" accept="video/*">
+            <button onclick="uploadVideo()">Analyze Video</button>
+            <div id="uploadStatus"></div>
+            <div id="framesResult" class="frames-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        function previewVideo() {
+            const url = document.getElementById('videoUrl').value;
+            const preview = document.getElementById('videoPreview');
+            
+            if (!url) {
+                alert('Please enter a video URL');
+                return;
+            }
+            
+            // Detect platform and create preview
+            if (url.includes('tiktok.com')) {
+                // Extract TikTok video ID and create iframe embed
+                const videoId = extractTikTokId(url);
+                if (videoId) {
+                    const embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
+                    preview.innerHTML = `
+                        <div style="display: flex; justify-content: center; margin: 20px 0;">
+                            <iframe 
+                                src="${embedUrl}"
+                                width="325" 
+                                height="580" 
+                                frameborder="0" 
+                                scrolling="no" 
+                                allowfullscreen
+                                style="border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+                            </iframe>
+                        </div>
+                        <p style="text-align: center; margin-top: 10px;">
+                            <small>Video ID: ${videoId} | <a href="${url}" target="_blank">View on TikTok</a></small>
+                        </p>
+                    `;
+                } else {
+                    preview.innerHTML = `
+                        <div style="padding: 20px; border: 1px solid #ddd; border-radius: 8px; text-align: center;">
+                            <p>TikTok Video Preview</p>
+                            <a href="${url}" target="_blank" style="color: #007bff;">View on TikTok</a>
+                            <p><small>Could not extract video ID for embed</small></p>
+                        </div>
+                    `;
+                }
+            } else if (url.includes('instagram.com')) {
+                // For Instagram, we'll show a simple link preview
+                preview.innerHTML = `
+                    <div style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                        <p>Instagram Video Preview</p>
+                        <a href="${url}" target="_blank" style="color: #007bff;">View on Instagram</a>
+                        <p><small>Note: Instagram embeds require oEmbed API</small></p>
+                    </div>
+                `;
+            } else {
+                preview.innerHTML = `
+                    <div style="padding: 20px; border: 1px solid #ddd; border-radius: 8px;">
+                        <p>Video URL: ${url}</p>
+                        <p><small>Platform not recognized - showing fallback preview</small></p>
+                    </div>
+                `;
+            }
+        }
+        
+        function extractTikTokId(url) {
+            // Handle different TikTok URL formats
+            const match = url.match(/\/video\/(\d+)/);
+            return match ? match[1] : null;
+        }
+        
+        async function extractFramesFromPreview() {
+            const statusDiv = document.getElementById('previewFramesStatus');
+            const framesDiv = document.getElementById('previewFramesResult');
+            const preview = document.getElementById('videoPreview');
+            
+            // Check if there's an iframe
+            const iframe = preview.querySelector('iframe');
+            if (!iframe) {
+                statusDiv.innerHTML = '<div class="error">❌ No video preview found. Please preview a video first.</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="loading">🔄 Attempting to extract frames from video preview...</div>';
+            framesDiv.innerHTML = '';
+            
+            try {
+                // Method 1: Try to access iframe content (will fail due to CORS but worth trying)
+                let videoElement = null;
+                
+                try {
+                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                    videoElement = iframeDoc.querySelector('video');
+                } catch (e) {
+                    console.log('Cannot access iframe content due to CORS:', e);
+                }
+                
+                if (videoElement) {
+                    // Direct access to video element
+                    await extractFramesFromVideoElement(videoElement, framesDiv, statusDiv);
+                } else {
+                    // Method 2: Try screen capture API (if supported)
+                    if (navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+                        statusDiv.innerHTML = `
+                            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                                <strong>🎥 Alternative: Screen Capture Method</strong>
+                                <br><br>
+                                1. Click "Start Screen Capture" below
+                                <br>2. Select this browser tab to share
+                                <br>3. Play the TikTok video while recording
+                                <br>4. We'll extract frames from your screen recording
+                                <br><br>
+                                <button onclick="startScreenCapture()" style="background: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                                    Start Screen Capture
+                                </button>
+                            </div>
+                            <div class="error" style="margin-top: 10px;">
+                                ❌ Direct frame extraction blocked by CORS policy.
+                                <br><br>
+                                <strong>Manual alternatives:</strong>
+                                <br>• Right-click the video → "Save video as..." → Upload below
+                                <br>• Use browser extension → Download → Upload below
+                                <br>• Use online TikTok downloader → Upload below
+                            </div>
+                        `;
+                    } else {
+                        statusDiv.innerHTML = `
+                            <div class="error">
+                                ❌ Cannot extract frames directly due to TikTok's security restrictions (CORS policy).
+                                <br><br>
+                                <strong>Alternative options:</strong>
+                                <br>• Right-click the video → "Save video as..." → Upload the saved file below
+                                <br>• Use a browser extension to download the video → Upload it below
+                                <br>• Use online TikTok downloaders → Upload the downloaded file below
+                            </div>
+                        `;
+                    }
+                }
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Frame extraction failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function extractFramesFromVideoElement(video, framesDiv, statusDiv) {
+            return new Promise((resolve, reject) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const frames = [];
+                
+                video.addEventListener('loadedmetadata', () => {
+                    canvas.width = Math.min(video.videoWidth, 720);
+                    canvas.height = (canvas.width / video.videoWidth) * video.videoHeight;
+                    
+                    const duration = video.duration;
+                    const frameInterval = Math.max(1, duration / 10); // Extract ~10 frames
+                    let currentTime = 0;
+                    let frameCount = 0;
+                    
+                    const captureFrame = () => {
+                        if (frameCount >= 10 || currentTime >= duration) {
+                            // Done capturing
+                            statusDiv.innerHTML = `<div class="success">✅ Extracted ${frames.length} frames!</div>`;
+                            
+                            // Display frames
+                            framesDiv.innerHTML = frames.map((frameData, index) => `
+                                <div class="frame-item">
+                                    <img src="${frameData}" alt="Frame ${index + 1}" style="width: 100%; height: 150px; object-fit: cover; border-radius: 8px;">
+                                    <p>Frame ${index + 1}</p>
+                                </div>
+                            `).join('');
+                            
+                            resolve(frames);
+                            return;
+                        }
+                        
+                        video.currentTime = currentTime;
+                        
+                        video.addEventListener('seeked', () => {
+                            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const frameData = canvas.toDataURL('image/jpeg', 0.8);
+                            frames.push(frameData);
+                            
+                            frameCount++;
+                            currentTime += frameInterval;
+                            
+                            setTimeout(captureFrame, 100); // Small delay between captures
+                        }, { once: true });
+                    };
+                    
+                    captureFrame();
+                });
+                
+                video.addEventListener('error', (e) => {
+                    reject(new Error('Video loading failed: ' + e.message));
+                });
+            });
+        }
+        
+        let mediaRecorder;
+        let recordedChunks = [];
+        
+        async function startScreenCapture() {
+            const statusDiv = document.getElementById('previewFramesStatus');
+            const framesDiv = document.getElementById('previewFramesResult');
+            
+            try {
+                statusDiv.innerHTML = '<div class="loading">🔄 Requesting screen capture permission...</div>';
+                
+                const stream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { mediaSource: 'screen' },
+                    audio: false
+                });
+                
+                // Create video element to display the captured stream
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.autoplay = true;
+                video.muted = true;
+                video.style.display = 'none'; // Hidden, just for frame extraction
+                document.body.appendChild(video);
+                
+                statusDiv.innerHTML = `
+                    <div style="background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 8px;">
+                        <strong>✅ Screen capture started!</strong>
+                        <br><br>
+                        📹 Now play the TikTok video and wait 10-15 seconds
+                        <br><br>
+                        <button onclick="captureFramesFromStream()" style="background: #dc3545; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">
+                            Stop & Extract Frames
+                        </button>
+                        <button onclick="stopScreenCapture()" style="background: #6c757d; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                            Cancel
+                        </button>
+                    </div>
+                `;
+                
+                // Store references for later use
+                window.currentScreenStream = stream;
+                window.currentScreenVideo = video;
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Screen capture failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function captureFramesFromStream() {
+            const statusDiv = document.getElementById('previewFramesStatus');
+            const framesDiv = document.getElementById('previewFramesResult');
+            const video = window.currentScreenVideo;
+            
+            if (!video) {
+                statusDiv.innerHTML = '<div class="error">❌ No screen capture active</div>';
+                return;
+            }
+            
+            statusDiv.innerHTML = '<div class="loading">🔄 Extracting frames from screen capture...</div>';
+            
+            try {
+                await extractFramesFromVideoElement(video, framesDiv, statusDiv);
+                stopScreenCapture();
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Frame extraction failed: ${error.message}</div>`;
+            }
+        }
+        
+        function stopScreenCapture() {
+            if (window.currentScreenStream) {
+                window.currentScreenStream.getTracks().forEach(track => track.stop());
+                window.currentScreenStream = null;
+            }
+            if (window.currentScreenVideo) {
+                window.currentScreenVideo.remove();
+                window.currentScreenVideo = null;
+            }
+        }
+        
+        async function uploadVideo() {
+            const fileInput = document.getElementById('videoFile');
+            const statusDiv = document.getElementById('uploadStatus');
+            const framesDiv = document.getElementById('framesResult');
+            
+            if (!fileInput.files[0]) {
+                alert('Please select a video file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            statusDiv.innerHTML = '<div class="loading">🔄 Analyzing video and extracting frames...</div>';
+            framesDiv.innerHTML = '';
+            
+            try {
+                const response = await fetch('http://localhost:8000/analyze-video', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+
+                statusDiv.innerHTML = `
+                    <div class="success">
+                        ✅ Success! Extracted ${result.frame_count} frames
+                        <br><small>Video ID: ${result.video_id}</small>
+                    </div>
+                `;
+
+                // Display Gemini Analysis Results
+                const analysis = result.analysis;
+                let analysisHTML = '<div style="background: #e7f3ff; padding: 20px; border-radius: 8px; margin: 20px 0;"><h3>🤖 Gemini AI Analysis Results</h3>';
+
+                if (analysis.consolidated_products && analysis.consolidated_products.length > 0) {
+                    analysisHTML += '<h4>🛍️ Products Detected:</h4>';
+                    analysis.consolidated_products.forEach((product, index) => {
+                        analysisHTML += `
+                            <div style="background: white; padding: 15px; margin: 10px 0; border-radius: 5px; border-left: 4px solid #007bff;">
+                                <h5>Product ${index + 1}: ${product.type ? product.type.toUpperCase() : 'Unknown'}</h5>
+                                <p><strong>Color:</strong> ${product.color || 'Not specified'}</p>
+                                <p><strong>Pattern:</strong> ${product.pattern || 'Not specified'}</p>
+                                <p><strong>Material:</strong> ${product.material || 'Not specified'}</p>
+                                <p><strong>Brand:</strong> ${product.brand_text || 'None detected'}</p>
+                                <p><strong>Description:</strong> ${product.description || 'No description'}</p>
+                                <p><strong>Confidence:</strong> ${Math.round((product.average_confidence || 0) * 100)}%</p>
+                                <p><strong>Seen in frames:</strong> ${product.frames_seen ? product.frames_seen.join(', ') : 'Unknown'}</p>
+                            </div>
+                        `;
+                    });
+
+                    // Add summary
+                    if (analysis.summary) {
+                        analysisHTML += '<h4>📊 Summary:</h4>';
+                        analysisHTML += `<p><strong>Total Products:</strong> ${analysis.total_products_detected || 0}</p>`;
+                        analysisHTML += `<p><strong>Unique Products:</strong> ${analysis.summary.total_unique_products || 0}</p>`;
+
+                        if (analysis.summary.product_types) {
+                            analysisHTML += '<p><strong>Product Types:</strong> ';
+                            const types = Object.entries(analysis.summary.product_types).map(([type, count]) => `${type} (${count})`);
+                            analysisHTML += types.join(', ') + '</p>';
+                        }
+
+                        if (analysis.summary.dominant_colors) {
+                            analysisHTML += '<p><strong>Colors Found:</strong> ';
+                            const colors = Object.entries(analysis.summary.dominant_colors).map(([color, count]) => `${color} (${count})`);
+                            analysisHTML += colors.join(', ') + '</p>';
+                        }
+
+                        if (analysis.summary.brands_detected && analysis.summary.brands_detected.length > 0) {
+                            analysisHTML += `<p><strong>Brands Detected:</strong> ${analysis.summary.brands_detected.join(', ')}</p>`;
+                        }
+                    }
+                } else {
+                    analysisHTML += '<p style="color: #666;">No fashion products detected in this video.</p>';
+                    if (analysis.summary && analysis.summary.message) {
+                        analysisHTML += `<p><em>${analysis.summary.message}</em></p>`;
+                    }
+                }
+
+                // Add raw JSON for developers
+                analysisHTML += `
+                    <details style="margin-top: 20px;">
+                        <summary style="cursor: pointer; font-weight: bold;">🔍 View Raw JSON Data</summary>
+                        <pre style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; margin-top: 10px;">${JSON.stringify(result, null, 2)}</pre>
+                    </details>
+                `;
+
+                analysisHTML += '</div>';
+
+                // Display frames with analysis
+                framesDiv.innerHTML = analysisHTML + result.frames.map((frameUrl, index) => `
+                    <div class="frame-item">
+                        <img src="http://localhost:8000${frameUrl}" alt="Frame ${index + 1}">
+                        <p>Frame ${index + 1}</p>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
