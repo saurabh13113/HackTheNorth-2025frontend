@@ -36,20 +36,33 @@ class VideoURL(BaseModel):
 
 def extract_frames_from_video(input_path: Path, frames_dir: Path, video_id: str):
     """Extract frames from video using FFmpeg"""
-    # Check if FFmpeg is available
-    try:
-        subprocess.run(["ffmpeg", "-version"], capture_output=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    # Try different FFmpeg paths
+    ffmpeg_paths = [
+        "ffmpeg",  # System PATH
+        "/c/Users/saura/AppData/Local/Packages/PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0/LocalCache/local-packages/Python310/site-packages/imageio_ffmpeg/binaries/ffmpeg-win-x86_64-v7.1.exe",
+        "C:\\Users\\saura\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.10_qbz5n2kfra8p0\\LocalCache\\local-packages\\Python310\\site-packages\\imageio_ffmpeg\\binaries\\ffmpeg-win-x86_64-v7.1.exe"
+    ]
+    
+    ffmpeg_cmd = None
+    for path in ffmpeg_paths:
+        try:
+            subprocess.run([path, "-version"], capture_output=True, check=True)
+            ffmpeg_cmd = path
+            break
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            continue
+    
+    if not ffmpeg_cmd:
         raise HTTPException(
             status_code=500, 
-            detail="FFmpeg not found. Please install FFmpeg: https://ffmpeg.org/download.html"
+            detail="FFmpeg not found. Please install FFmpeg or ensure it's in your PATH."
         )
     
     # Extract frames using FFmpeg
     try:
         frame_pattern = str(frames_dir / "frame_%03d.jpg")
         cmd = [
-            "ffmpeg",
+            ffmpeg_cmd,
             "-i", str(input_path),
             "-vf", "fps=1,scale=720:-1",
             "-frames:v", "10",
