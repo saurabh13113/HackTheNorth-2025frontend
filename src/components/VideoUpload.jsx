@@ -1,8 +1,9 @@
 import { useState, useRef } from 'react';
 import { Upload, File, X, Play, CheckCircle, AlertCircle, Film } from 'lucide-react';
 import { useToast } from './Toast';
+import { analyzeVideo } from '../lib/api';
 
-const VideoUpload = ({ onUpload }) => {
+const VideoUpload = ({ onUpload, onFileSelect }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [dragState, setDragState] = useState('idle'); // idle, active, accept, reject
@@ -12,6 +13,9 @@ const VideoUpload = ({ onUpload }) => {
   const handleFileSelect = (file) => {
     if (file && file.type.startsWith('video/')) {
       setSelectedFile(file);
+      if (onFileSelect) {
+        onFileSelect(file);
+      }
       toast.success('Video file selected successfully!', 'Ready to Analyze');
     } else {
       toast.error('Please select a valid video file', 'Invalid File Type');
@@ -57,16 +61,7 @@ const VideoUpload = ({ onUpload }) => {
       const formData = new FormData();
       formData.append('file', selectedFile);
 
-      const response = await fetch('http://localhost:8000/analyze-video', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await analyzeVideo(formData);
       onUpload(result);
 
       toast.success(
@@ -83,6 +78,9 @@ const VideoUpload = ({ onUpload }) => {
 
   const clearFile = () => {
     setSelectedFile(null);
+    if (onFileSelect) {
+      onFileSelect(null);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -230,11 +228,11 @@ const VideoUpload = ({ onUpload }) => {
               </button>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center btn-group">
               <button
                 onClick={handleUpload}
                 disabled={isUploading}
-                className="btn btn-primary flex-1 max-w-xs"
+                className="btn btn-primary btn-lg flex-1 max-w-xs btn-mobile-full"
               >
                 {isUploading ? (
                   <>
@@ -252,7 +250,7 @@ const VideoUpload = ({ onUpload }) => {
               {!isUploading && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="btn btn-ghost"
+                  className="btn btn-ghost btn-mobile-full"
                 >
                   <Upload className="w-4 h-4" />
                   Choose Different File

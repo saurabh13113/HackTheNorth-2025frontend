@@ -6,12 +6,14 @@ import Header from './components/Header';
 import TabButton from './components/TabButton';
 import VideoPreview from './components/VideoPreview';
 import VideoUpload from './components/VideoUpload';
+import UploadedVideoPreview from './components/UploadedVideoPreview';
 import ProductGrid, { EmptyState } from './components/ProductGrid';
 import './styles/globals.css';
 
 function AppContent() {
   const [activeTab, setActiveTab] = useState('link');
   const [videoUrl, setVideoUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState(null);
   const [analyzedProducts, setAnalyzedProducts] = useState([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -78,12 +80,17 @@ function AppContent() {
     }
   };
 
+  const handleFileSelect = (file) => {
+    setSelectedFile(file);
+  };
+
   const handleTabChange = (tab) => {
     setActiveTab(tab);
     // Clear results when switching tabs for better UX
     if (tab !== activeTab) {
       setAnalyzedProducts([]);
       setVideoUrl('');
+      setSelectedFile(null);
       setIsAnalyzing(false);
     }
   };
@@ -93,36 +100,36 @@ function AppContent() {
       <Header />
 
       <main className="container py-8">
-        <div className="grid-2 gap-8">
-          {/* Left Column - Video Content */}
-          <div className="space-y-6">
-            <div className="card p-6">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-primary mb-2">Video Analysis</h2>
-                <p className="text-secondary">
-                  Upload a video or paste a link to discover fashion products using AI
-                </p>
-              </div>
+        <div className="space-y-8">
+          {/* Video Content Section */}
+          <div className="card p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-primary mb-2">Video Analysis</h2>
+              <p className="text-secondary">
+                Upload a video or paste a link to discover fashion products using AI
+              </p>
+            </div>
 
-              {/* Enhanced Tab Navigation */}
-              <div className="flex gap-1 mb-8 p-1 bg-tertiary rounded-xl">
-                <TabButton
-                  active={activeTab === 'link'}
-                  onClick={() => handleTabChange('link')}
-                  icon={Link}
-                >
-                  Video Link
-                </TabButton>
-                <TabButton
-                  active={activeTab === 'upload'}
-                  onClick={() => handleTabChange('upload')}
-                  icon={Upload}
-                >
-                  Upload File
-                </TabButton>
-              </div>
+            {/* Enhanced Tab Navigation */}
+            <div className="flex gap-1 mb-8 p-1 bg-tertiary rounded-xl max-w-md">
+              <TabButton
+                active={activeTab === 'link'}
+                onClick={() => handleTabChange('link')}
+                icon={Link}
+              >
+                Video Link
+              </TabButton>
+              <TabButton
+                active={activeTab === 'upload'}
+                onClick={() => handleTabChange('upload')}
+                icon={Upload}
+              >
+                Upload File
+              </TabButton>
+            </div>
 
-              {/* Tab Content */}
+            <div className="grid lg:grid-cols-2 gap-8">
+              {/* Left - Tab Content */}
               <div className="animate-fadeInUp">
                 {activeTab === 'link' && (
                   <div className="space-y-6">
@@ -152,33 +159,49 @@ function AppContent() {
                 )}
 
                 {activeTab === 'upload' && (
-                  <VideoUpload onUpload={handleVideoUpload} />
+                  <VideoUpload onUpload={handleVideoUpload} onFileSelect={handleFileSelect} />
                 )}
               </div>
-            </div>
 
-            {/* Video Preview Section - Only for link tab */}
-            {activeTab === 'link' && videoUrl && (
-              <div className="animate-fadeInUp">
-                <VideoPreview
-                  url={videoUrl}
-                  onAnalyze={handleVideoLinkAnalysis}
-                />
-              </div>
-            )}
+              {/* Right - Video Preview Section */}
+              {activeTab === 'link' && videoUrl && (
+                <div className="animate-fadeInUp">
+                  <VideoPreview
+                    url={videoUrl}
+                    onAnalyze={handleVideoLinkAnalysis}
+                  />
+                </div>
+              )}
+
+              {/* Right - Uploaded Video Preview Section */}
+              {activeTab === 'upload' && selectedFile && (
+                <div className="animate-fadeInUp">
+                  <UploadedVideoPreview
+                    file={selectedFile}
+                    onAnalyze={handleVideoUpload}
+                    isAnalyzing={isAnalyzing}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right Column - Product Cards */}
-          <div className="card p-6">
-            {!isAnalyzing && analyzedProducts.length === 0 ? (
-              <EmptyState type="default" />
-            ) : (
+          {/* Product Cards Section - Full Width Below */}
+          {(isAnalyzing || analyzedProducts.length > 0) && (
+            <div className="card p-6">
               <ProductGrid
                 products={analyzedProducts}
                 isLoading={isAnalyzing}
               />
-            )}
-          </div>
+            </div>
+          )}
+
+          {/* Empty State - Full Width When No Products */}
+          {!isAnalyzing && analyzedProducts.length === 0 && (
+            <div className="card p-6">
+              <EmptyState type="default" />
+            </div>
+          )}
         </div>
 
         {/* Additional Features Section */}
@@ -193,12 +216,12 @@ function AppContent() {
                 Each product has been analyzed for style, color, material, and brand recognition.
               </p>
 
-              <div className="flex flex-wrap gap-3 justify-center">
-                <button className="btn btn-primary">
+              <div className="flex flex-wrap gap-3 justify-center btn-group">
+                <button className="btn btn-primary btn-mobile-full">
                   <Upload className="w-4 h-4" />
                   Export Results
                 </button>
-                <button className="btn btn-secondary">
+                <button className="btn btn-secondary btn-mobile-full">
                   <Link className="w-4 h-4" />
                   Share Analysis
                 </button>

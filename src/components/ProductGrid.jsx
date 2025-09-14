@@ -89,7 +89,7 @@ const ProductGrid = ({ products, isLoading }) => {
           <div className="loading-shimmer h-8 w-24 rounded" />
         </div>
 
-        <div className="grid-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[...Array(3)].map((_, index) => (
             <ProductCardSkeleton key={index} />
           ))}
@@ -159,7 +159,7 @@ const ProductGrid = ({ products, isLoading }) => {
       </div>
 
       {/* Products Grid */}
-      <div className="grid-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {products.map((product, index) => (
           <ProductCard
             key={`${product.type}-${product.color}-${index}`}
