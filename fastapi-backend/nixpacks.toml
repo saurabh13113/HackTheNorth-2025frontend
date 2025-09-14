@@ -1,2 +1,6 @@
+# fastapi-backend/nixpacks.toml
+providers = ['...', 'python']  # force Python provider
 [phases.setup]
-nixPkgs = ["ffmpeg"]
+aptPkgs = ['...', 'ffmpeg']    # install ffmpeg on Ubuntu base
+[start]
+cmd = "uvicorn app.app:app --host 0.0.0.0 --port 8000"
